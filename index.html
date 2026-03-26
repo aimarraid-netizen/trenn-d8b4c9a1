@@ -14,6 +14,10 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
+
+    <!-- Chart.js for progress graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -245,6 +249,74 @@
         }
 
         /* ===================================
+           EXERCISE PROGRESS SECTION
+           =================================== */
+        .exercise-progress-section {
+            margin-top: 30px;
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        .exercise-progress-section h3 {
+            color: #4CAF50;
+            margin-bottom: 15px;
+        }
+        .exercise-selector {
+            margin-bottom: 20px;
+        }
+        .exercise-selector select {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            background: #1a1a1a;
+            color: #fff;
+            border: 2px solid #4CAF50;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .exercise-selector select:focus {
+            outline: none;
+            border-color: #66BB6A;
+        }
+        .chart-container {
+            position: relative;
+            background: #1a1a1a;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 15px;
+        }
+        .exercise-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .exercise-stat-card {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 3px solid #4CAF50;
+        }
+        .exercise-stat-label {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 5px;
+        }
+        .exercise-stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        .exercise-stat-change {
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        .exercise-stat-change.positive {
+            color: #4CAF50;
+        }
+
+        /* ===================================
            MOBILE RESPONSIVE
            =================================== */
         @media (max-width: 768px) {
@@ -429,6 +501,42 @@
             .recommendations h4 {
                 font-size: 15px;
             }
+
+            /* Exercise progress mobile */
+            .exercise-progress-section {
+                padding: 15px;
+                margin-top: 20px;
+            }
+
+            .exercise-progress-section h3 {
+                font-size: 18px;
+            }
+
+            .exercise-selector select {
+                font-size: 14px;
+                padding: 10px;
+            }
+
+            .exercise-stats {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+            }
+
+            .exercise-stat-card {
+                padding: 10px;
+            }
+
+            .exercise-stat-label {
+                font-size: 10px;
+            }
+
+            .exercise-stat-value {
+                font-size: 18px;
+            }
+
+            .chart-container {
+                padding: 10px;
+            }
         }
 
         /* Extra väikesed ekraanid (< 400px) */
@@ -466,7 +574,7 @@
 </head>
 <body>
     <div class="container">
-        <div class="timestamp">Genereeritud: 26.03.2026 20:38</div>
+        <div class="timestamp">Genereeritud: 26.03.2026 20:44</div>
         <h1>🏋️ Treeningute Kalender</h1>
 
         <div class="month-nav">
@@ -501,6 +609,24 @@
             <div class="progress-grid" id="progressGrid"></div>
 
             <div class="recommendations" id="recommendations"></div>
+        </div>
+
+        <div class="exercise-progress-section">
+            <h3>📊 Harjutuste Progress</h3>
+
+            <div class="exercise-selector">
+                <select id="exerciseSelect" onchange="showExerciseProgress()">
+                    <option value="">-- Vali harjutus --</option>
+                </select>
+            </div>
+
+            <div id="exerciseStatsContainer" style="display: none;">
+                <div class="exercise-stats" id="exerciseStats"></div>
+
+                <div class="chart-container">
+                    <canvas id="progressChart"></canvas>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -896,6 +1022,251 @@
             recommendations.innerHTML = tips;
         }
 
+        // ===================================
+        // EXERCISE PROGRESS FUNCTIONALITY
+        // ===================================
+
+        let exerciseProgressChart = null;
+
+        function initializeExerciseProgress() {
+            const allWorkouts = Object.values(workouts).flat();
+            const gymWorkouts = allWorkouts.filter(w => w.source === 'gymaholic');
+
+            // Kogume kõik unikaalsed harjutused
+            const exercises = new Set();
+            gymWorkouts.forEach(w => {
+                if (w.exercises) {
+                    w.exercises.forEach(ex => {
+                        const name = ex.name;
+                        // Väldi soojendusi ja lõpetusi
+                        if (!name.toLowerCase().includes('rowing') &&
+                            !name.toLowerCase().includes('treadmill') &&
+                            ex.weight_kg > 0) {
+                            exercises.add(name);
+                        }
+                    });
+                }
+            });
+
+            // Täida dropdown
+            const select = document.getElementById('exerciseSelect');
+            const sortedExercises = Array.from(exercises).sort();
+
+            sortedExercises.forEach(exercise => {
+                const option = document.createElement('option');
+                option.value = exercise;
+                option.textContent = exercise;
+                select.appendChild(option);
+            });
+        }
+
+        function showExerciseProgress() {
+            const selectedExercise = document.getElementById('exerciseSelect').value;
+            const container = document.getElementById('exerciseStatsContainer');
+
+            if (!selectedExercise) {
+                container.style.display = 'none';
+                return;
+            }
+
+            container.style.display = 'block';
+
+            // Kogume selle harjutuse andmed
+            const allWorkouts = Object.values(workouts).flat();
+            const gymWorkouts = allWorkouts.filter(w => w.source === 'gymaholic');
+
+            const exerciseData = [];
+            gymWorkouts.forEach(w => {
+                if (w.exercises) {
+                    w.exercises.forEach(ex => {
+                        if (ex.name === selectedExercise && ex.weight_kg > 0) {
+                            exerciseData.push({
+                                date: w.timestamp || w.date,
+                                weight: ex.weight_kg,
+                                reps: ex.reps,
+                                sets: ex.sets,
+                                volume: ex.total_volume || 0
+                            });
+                        }
+                    });
+                }
+            });
+
+            // Sorteeri kuupäeva järgi
+            exerciseData.sort((a, b) => a.date.localeCompare(b.date));
+
+            if (exerciseData.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+
+            // Arvuta statistika
+            const currentData = exerciseData[exerciseData.length - 1];
+            const firstData = exerciseData[0];
+            const prWeight = Math.max(...exerciseData.map(d => d.weight));
+            const prReps = Math.max(...exerciseData.filter(d => d.weight === prWeight).map(d => d.reps));
+
+            const weightProgress = currentData.weight - firstData.weight;
+            const repsProgress = currentData.reps - firstData.reps;
+
+            // Baseline kaalud
+            const baselines = {
+                'Barbell Bench Press': 60,
+                'Bent Over Barbell Row': 55,
+                'Romanian Deadlift': 50,
+                'Barbell Squat': 55,
+                'Barbell Curl': 30
+            };
+            const baseline = baselines[selectedExercise];
+
+            // Näita statistikat
+            const statsHTML = `
+                <div class="exercise-stat-card">
+                    <div class="exercise-stat-label">Praegune</div>
+                    <div class="exercise-stat-value">${currentData.sets}×${currentData.reps} @ ${currentData.weight}kg</div>
+                </div>
+                <div class="exercise-stat-card">
+                    <div class="exercise-stat-label">Personal Record</div>
+                    <div class="exercise-stat-value">${prWeight}kg × ${prReps}</div>
+                </div>
+                <div class="exercise-stat-card">
+                    <div class="exercise-stat-label">Progress (kaal)</div>
+                    <div class="exercise-stat-value ${weightProgress > 0 ? 'positive' : ''}">${weightProgress > 0 ? '+' : ''}${weightProgress}kg</div>
+                    <div class="exercise-stat-change ${weightProgress > 0 ? 'positive' : ''}">
+                        ${((weightProgress / firstData.weight) * 100).toFixed(0)}%
+                    </div>
+                </div>
+                ${baseline ? `
+                <div class="exercise-stat-card">
+                    <div class="exercise-stat-label">vs Baseline</div>
+                    <div class="exercise-stat-value">${baseline}kg → ${currentData.weight}kg</div>
+                    <div class="exercise-stat-change positive">+${currentData.weight - baseline}kg</div>
+                </div>
+                ` : ''}
+                <div class="exercise-stat-card">
+                    <div class="exercise-stat-label">Treeninguid</div>
+                    <div class="exercise-stat-value">${exerciseData.length}</div>
+                </div>
+            `;
+
+            document.getElementById('exerciseStats').innerHTML = statsHTML;
+
+            // Joonista graafik
+            drawProgressChart(exerciseData, selectedExercise, baseline);
+        }
+
+        function drawProgressChart(data, exerciseName, baseline) {
+            const ctx = document.getElementById('progressChart');
+
+            // Hävita vana graafik
+            if (exerciseProgressChart) {
+                exerciseProgressChart.destroy();
+            }
+
+            // Vorminda kuupäevad
+            const labels = data.map(d => {
+                const date = new Date(d.date);
+                return date.toLocaleDateString('et-EE', { day: '2-digit', month: '2-digit' });
+            });
+
+            // Andmed
+            const weights = data.map(d => d.weight);
+            const reps = data.map(d => d.reps);
+
+            const datasets = [
+                {
+                    label: 'Kaal (kg)',
+                    data: weights,
+                    borderColor: '#4CAF50',
+                    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                    yAxisID: 'y',
+                    tension: 0.3,
+                    fill: true
+                },
+                {
+                    label: 'Kordused',
+                    data: reps,
+                    borderColor: '#2196F3',
+                    backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                    yAxisID: 'y1',
+                    tension: 0.3,
+                    fill: true
+                }
+            ];
+
+            // Lisa baseline joon kui on
+            if (baseline) {
+                datasets.push({
+                    label: 'Baseline',
+                    data: Array(data.length).fill(baseline),
+                    borderColor: '#FF9800',
+                    borderDash: [5, 5],
+                    borderWidth: 2,
+                    yAxisID: 'y',
+                    pointRadius: 0
+                });
+            }
+
+            exerciseProgressChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: exerciseName + ' - Progress',
+                            color: '#fff',
+                            font: { size: 16 }
+                        },
+                        legend: {
+                            labels: { color: '#fff' }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#999' },
+                            grid: { color: '#3a3a3a' }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Kaal (kg)',
+                                color: '#4CAF50'
+                            },
+                            ticks: { color: '#4CAF50' },
+                            grid: { color: '#3a3a3a' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Kordused',
+                                color: '#2196F3'
+                            },
+                            ticks: { color: '#2196F3' },
+                            grid: { drawOnChartArea: false }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize
+        initializeExerciseProgress();
         renderCalendar();
     </script>
 </body>
