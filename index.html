@@ -589,7 +589,7 @@
 </head>
 <body>
     <div class="container">
-        <div class="timestamp">Genereeritud: 12.04.2026 12:44</div>
+        <div class="timestamp">Genereeritud: 12.04.2026 12:45</div>
 
         <div class="month-nav">
             <button onclick="prevMonth()">← Eelmine</button>
@@ -761,13 +761,21 @@
                         const fullName = name.replace(/^\d+\.\s*/, '').trim();
                         workoutLabel = `<div class="day-name">${fullName}</div>`;
                     } else {
-                        // Kardio: näita distants ja keskmine pulss
+                        // Kardio: nimi + distants/pulss
                         const w = dayWorkouts[0];
+                        const cardioNames = {
+                            'walking': 'Kõndimine',
+                            'running': 'Jooksmine',
+                            'cycling': 'Rattasõit',
+                            'hiking': 'Matkamine',
+                            'swimming': 'Ujumine'
+                        };
+                        const cardioName = cardioNames[w.workout_type] || w.workout_name || 'Kardio';
                         const distanceInfo = w.distance > 0 ? `${w.distance.toFixed(1)}km` : '';
                         const hrInfo = w.avg_hr > 0 ? `${w.avg_hr} bpm` : '';
-                        if (distanceInfo || hrInfo) {
-                            workoutLabel = `<div class="day-cardio-info">${distanceInfo}${distanceInfo && hrInfo ? '<br>' : ''}${hrInfo}</div>`;
-                        }
+                        const extra = [distanceInfo, hrInfo].filter(Boolean).join(' · ');
+                        workoutLabel = `<div class="day-name">${cardioName}</div>` +
+                            (extra ? `<div class="day-cardio-info">${extra}</div>` : '');
                     }
 
                     dayEl.innerHTML = `
