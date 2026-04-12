@@ -24,9 +24,9 @@
             --surface: #181818;
             --surface2: #222;
             --border: #2a2a2a;
-            --text: #e8e8e8;
-            --text2: #999;
-            --text3: #555;
+            --text: #f0f0f0;
+            --text2: #b0b0b0;
+            --text3: #666;
             --accent: #c8a86e;
             --accent2: #a68b5b;
             --green: #5a9a6a;
@@ -492,7 +492,7 @@
 </head>
 <body>
     <div class="container">
-        <div class="timestamp">Genereeritud: 12.04.2026 13:21</div>
+        <div class="timestamp">Genereeritud: 12.04.2026 13:24</div>
 
         <div class="month-nav">
             <button onclick="prevMonth()">&#8249;</button>
@@ -622,22 +622,22 @@
                         return w.workout_type;
                     }))];
 
-                    // Värvi kaart
+                    // Värvi kaart (uus stiil)
                     const colorMap = {
-                        'gym-jalad': '#f44336',   // Punane
-                        'gym-rind': '#4CAF50',    // Roheline
-                        'gym-selg': '#FFC107',    // Kollane
-                        'walking': '#2196F3',     // Sinine
-                        'running': '#FF9800',     // Oranž
-                        'cycling': '#9C27B0',     // Lilla
-                        'hiking': '#795548',      // Pruun
-                        'swimming': '#00BCD4'     // Tsüaan
+                        'gym-jalad': '#b85450',
+                        'gym-rind': '#5a9a6a',
+                        'gym-selg': '#c8a86e',
+                        'walking': '#5b8fb9',
+                        'running': '#c49052',
+                        'cycling': '#8b6fb0',
+                        'hiking': '#8a7260',
+                        'swimming': '#5a9a9a'
                     };
 
                     if (types.length > 1) {
-                        // Dünaamiline gradient tegelike värvidega
-                        const colors = types.map(t => colorMap[t] || '#666').slice(0, 2);
-                        dayEl.style.background = `linear-gradient(135deg, ${colors[0]} 50%, ${colors[1]} 50%)`;
+                        const colors = types.map(t => colorMap[t] || '#666');
+                        dayEl.style.borderLeft = `3px solid ${colors[0]}`;
+                        dayEl.style.borderRight = `3px solid ${colors[1]}`;
                         dayEl.className += ' multi';
                     } else {
                         dayEl.className += ` ${types[0]}`;
