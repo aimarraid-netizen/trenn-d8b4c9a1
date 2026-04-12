@@ -491,7 +491,7 @@
 </head>
 <body>
     <div class="container">
-        <div class="timestamp">Genereeritud: 12.04.2026 13:27</div>
+        <div class="timestamp">Genereeritud: 12.04.2026 13:29</div>
 
         <div class="month-nav">
             <button onclick="prevMonth()">&#8249;</button>
@@ -900,6 +900,27 @@
             const gymWorkouts = allWorkouts.filter(w => w.source === 'gymaholic');
             const baselines = getBaselines();
 
+            // Harjutuse → treeningu tüübi mapping
+            const exerciseTypeMap = {};
+            gymWorkouts.forEach(w => {
+                const wtype = w.workout_type || '';
+                if (w.exercises) {
+                    w.exercises.forEach(ex => {
+                        if (ex.weight_kg > 0 && !ex.name.toLowerCase().includes('rowing') && !ex.name.toLowerCase().includes('treadmill')) {
+                            exerciseTypeMap[ex.name] = wtype;
+                        }
+                    });
+                }
+            });
+
+            // Tüübi värvid
+            const typeColors = {
+                'jalad': '#b85450',
+                'rind': '#5a9a6a',
+                'selg': '#c8a86e',
+                'strength': '#888'
+            };
+
             // Leia iga harjutuse parim tulemus
             const prs = {};
             gymWorkouts.forEach(w => {
@@ -934,6 +955,9 @@
                 const baseline = baselines[name];
                 const item = document.createElement('div');
                 item.className = 'progress-item';
+                const exType = exerciseTypeMap[name] || 'strength';
+                const borderColor = typeColors[exType] || '#888';
+                item.style.borderLeftColor = borderColor;
 
                 let changeHtml = '<span class="baseline-hint">klõpsa baseline lisamiseks</span>';
                 if (baseline !== undefined) {
