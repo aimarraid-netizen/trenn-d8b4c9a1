@@ -1,0 +1,22 @@
+Harjutus,Setid,Kordused_min,Kordused_max,Kategooria
+Barbell Bench Press,3,6,8,liitharjutus
+Barbell Squat,3,6,10,liitharjutus
+Bent Over Barbell Row,3,6,10,liitharjutus
+One-Arm Dumbbell Row,3,6,10,liitharjutus
+Triceps Dips,3,6,10,liitharjutus
+Incline Dumbbell Press,3,10,12,hüpertroofia
+Romanian Deadlift,3,10,12,hüpertroofia
+Seated Cable Rows,3,10,12,hüpertroofia
+Wide-Grip Lat Pulldown,3,8,12,hüpertroofia
+Barbell Curl,3,8,12,hüpertroofia
+Seated Hammer Curls,3,10,12,hüpertroofia
+Lying Triceps Press,3,10,12,hüpertroofia
+Seated Triceps Press,3,8,12,hüpertroofia
+Lunge,3,8,12,hüpertroofia
+Side Lateral Raise,3,12,15,isolatsioon
+Triceps Pushdown with Rope,3,10,15,isolatsioon
+Single-Leg Press,3,10,15,isolatsioon
+Standing Calf Raise,3,15,25,isolatsioon
+Face Pull,3,20,20,fikseeritud
+Lying Leg Raise,3,0,0,max
+Plank,3,0,0,max
