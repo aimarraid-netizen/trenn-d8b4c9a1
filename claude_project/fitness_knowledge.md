@@ -1,5 +1,5 @@
 # Fitness Tracker - Treeningute Ajalugu
-**Viimati uuendatud:** 21.05.2026 20:30
+**Viimati uuendatud:** 23.05.2026 17:00
 ---
 
 ## Kasutaja Profiil
@@ -28,10 +28,10 @@ Iga harjutus on määratud setide ja korduste vahemikuga (nt 3×6-8). Alustan va
 - **🏋️ Jõusaal:** 37 treeningut | 186592 kg kogumaht
 - **🚶 Kõndimine:** 4 treeningut | 22.7 km
 - **🚴 Rattasõit:** 3 treeningut | 54.9 km
-- **⛰️ Matkamine:** 3 treeningut | 46.7 km
+- **⛰️ Matkamine:** 4 treeningut | 68.4 km
 - **🏊 Ujumine:** 2 treeningut | 2.0 km
 
-**KOKKU:** 49 treeningut
+**KOKKU:** 50 treeningut
 
 ---
 
@@ -44,7 +44,7 @@ Iga harjutus on määratud setide ja korduste vahemikuga (nt 3×6-8). Alustan va
 ---
 
 ## 🏆 Personal Records (PR)
-**Viimati uuendatud:** 21.05.2026
+**Viimati uuendatud:** 23.05.2026
 
 ### TOP 5 Raskeimad
 1. **Bent Over Barbell Row:** 1×6 @ 70.0kg (21.05.2026) | Baseline: 40.0kg → **+30.0kg (75%)** 🔥
@@ -102,9 +102,9 @@ Baseline = esimene salvestatud töökaal ajaloos. Vahemik = topeltprogressiooni 
 |---------|----------------|----------------|--------|
 | Jõutreeninguid | 6 | 7 | 📈 +1 (+17%) |
 | Jõu kogumaht | 33901kg | 44339kg | 📈 +10438kg (+31%) |
-| Kardio treeninguid | 4 | 0 | 📉 -4 (-100%) |
-| Kardio keskmine HR | 140 bpm | 0 bpm | 📉 -140 bpm (-100%) |
-| Kardio distants | 53.9 km | 0.0 km | 📉 -53.9 km (-100%) |
+| Kardio treeninguid | 4 | 1 | 📉 -3 (-75%) |
+| Kardio keskmine HR | 140 bpm | 115 bpm | 📉 -25 bpm (-18%) |
+| Kardio distants | 53.9 km | 21.8 km | 📉 -32.1 km (-60%) |
 
 ---
 
@@ -116,7 +116,15 @@ Aimari vasak jalg on vana vigastuse tõttu nõrgem. Jälgi, et ühepoolsed harju
 
 ---
 
-## Treeningute Ajalugu (49 treeningut)
+## Treeningute Ajalugu (50 treeningut)
+
+### ⛰️ 23.05.2026 - Saturday Morning Hike
+- **Tüüp:** hiking
+- **Kestus:** 309 min
+- **Keskmine HR:** 115 bpm
+- **Max HR:** 157 bpm
+- **Kalorid:** 2402 kcal
+- **Distants:** 21.77 km
 
 ### 🏋️ 21.05.2026 - 3. Selg & biitseps
 - **Tüüp:** selg
