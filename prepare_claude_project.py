@@ -5,17 +5,22 @@ Genereerib Markdown formaadis kokkuvõtte treeningute ajaloost.
 """
 
 import csv as csv_module
-import json
-import os
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent / 'v2'))
+from db import get_db  # noqa: E402
+
 # Andmete asukoht
 DATA_DIR = Path(__file__).parent / 'data'
-HISTORY_FILE = DATA_DIR / 'workout_history.json'
 RANGES_FILE = Path(__file__).parent / 'harjutuste_vahemikud.csv'
 OUTPUT_DIR = Path(__file__).parent / 'claude_project'
 OUTPUT_FILE = OUTPUT_DIR / 'fitness_knowledge.md'
+
+# DB hoiab kardio tüüpe eesti keeles, vana raport inglise keeles
+TYPE_EN = {"kõndimine": "walking", "jooksmine": "running", "rattasõit": "cycling",
+           "matk": "hiking", "ujumine": "swimming"}
 
 
 def load_exercise_ranges():
@@ -78,49 +83,57 @@ def compute_current_top(gym_workouts):
     return current
 
 def load_workout_history():
-    """Lae treeningute ajalugu"""
-    if HISTORY_FILE.exists():
-        with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            if isinstance(data, dict) and 'workouts' in data:
-                return data['workouts']
-            elif isinstance(data, list):
-                return data
-    return []
+    """Jõutrennid SQLite-st (säilitab vana JSON-i kuju, mida raport ootab)."""
+    conn = get_db()
+    out = []
+    for w in conn.execute(
+        "SELECT * FROM workouts WHERE source IN ('gymaholic','gymaholic_csv') "
+        "ORDER BY timestamp"
+    ):
+        wd = dict(w)
+        by_ex = {}
+        for s in conn.execute(
+            "SELECT * FROM sets WHERE workout_id=? ORDER BY id", (wd["id"],)
+        ):
+            e = by_ex.setdefault(s["exercise_name"], {
+                "name": s["exercise_name"], "sets": 0, "reps": 0,
+                "weight_kg": 0, "total_volume": 0.0,
+            })
+            e["sets"] += 1
+            e["total_volume"] += s["total_volume"] or 0.0
+            if (s["weight_kg"] or 0) >= e["weight_kg"]:
+                e["weight_kg"] = s["weight_kg"] or 0
+                e["reps"] = s["reps"] or 0
+        wd["exercises"] = list(by_ex.values())
+        wd["source"] = "gymaholic"
+        wd["total_volume"] = wd.get("total_volume") or 0
+        out.append(wd)
+    conn.close()
+    return out
+
 
 def load_workoutdoor_data():
-    """Lae Workoutdoor CSV failid"""
-    workouts = []
-    csv_dir = DATA_DIR / 'processed' / 'csv'
-
-    if not csv_dir.exists():
-        return workouts
-
-    import csv
-    for csv_file in csv_dir.glob('*.csv'):
-        try:
-            with open(csv_file, 'r', encoding='utf-8') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    filename = csv_file.stem
-                    workout = {
-                        'source': 'workoutdoor',
-                        'timestamp': row.get('timestamp', ''),
-                        'date': row.get('timestamp', '').split()[0] if row.get('timestamp') else '',
-                        'workout_name': filename.split('_', 2)[2] if '_' in filename else 'Cardio',
-                        'workout_type': row.get('activity_type', 'cardio'),
-                        'duration_min': int(float(row.get('duration_sec', 0))) // 60,
-                        'distance': float(row.get('distance_m', 0)) / 1000,
-                        'avg_hr': int(float(row.get('avg_hr', 0))),
-                        'max_hr': int(float(row.get('max_hr', 0))),
-                        'kcal': int(float(row.get('calories', 0))),
-                    }
-                    workouts.append(workout)
-        except Exception as e:
-            print(f"Viga Workoutdoor faili lugemisel {csv_file}: {e}")
-            continue
-
-    return workouts
+    """Kardiotrennid SQLite-st (säilitab vana CSV-kuju, mida raport ootab)."""
+    conn = get_db()
+    out = []
+    for w in conn.execute(
+        "SELECT * FROM workouts WHERE source IN ('fit','gpx') ORDER BY timestamp"
+    ):
+        wd = dict(w)
+        out.append({
+            'source': 'workoutdoor',
+            'timestamp': wd['timestamp'],
+            'date': wd['date'],
+            'workout_name': wd.get('workout_name') or 'Cardio',
+            'workout_type': TYPE_EN.get(wd.get('workout_type'), wd.get('workout_type') or 'cardio'),
+            'duration_min': wd.get('duration_min') or 0,
+            'distance': (wd.get('distance_m') or 0) / 1000,
+            'avg_hr': wd.get('avg_hr') or 0,
+            'max_hr': 0,
+            'kcal': wd.get('kcal') or 0,
+        })
+    conn.close()
+    return out
 
 def generate_fitness_knowledge():
     """Genereeri Markdown fail Claude'i jaoks"""
@@ -220,7 +233,7 @@ def generate_fitness_knowledge():
         output.append(f"- **Periood:** {first_date.strftime('%d.%m.%Y')} - {last_date.strftime('%d.%m.%Y')}\n")
         output.append(f"- **Kokku:** {len(gym_workouts)} jõutreeningut ({int(weeks)} nädalat)\n")
         output.append(f"- **Keskmine:** {workouts_per_week:.1f} treeningut nädalas\n")
-        output.append(f"- **Rutiin:** Soojendus (5 min sõudmine) + Jõutrenn + Lõpetus (30 min kõndimine)\n")
+        output.append("- **Rutiin:** Soojendus (5 min sõudmine) + Jõutrenn + Lõpetus (30 min kõndimine)\n")
         output.append("\n---\n\n")
 
     # Personal Records (PR)
@@ -352,7 +365,7 @@ def generate_fitness_knowledge():
         diff = b - a
         pct = (diff / a * 100) if a else 0
         arrow = '📈' if diff > 0 else ('📉' if diff < 0 else '➡️')
-        diff_str = f"{arrow} {diff:+{fmt}}{unit} ({pct:+.0f}%)" if a else f"uus"
+        diff_str = f"{arrow} {diff:+{fmt}}{unit} ({pct:+.0f}%)" if a else "uus"
         output.append(f"| {label} | {a:{fmt}}{unit} | {b:{fmt}}{unit} | {diff_str} |\n")
 
     row("Jõutreeninguid", len(prev_gym), len(recent_gym))
@@ -426,7 +439,7 @@ def generate_fitness_knowledge():
     for w in all_workouts:  # KÕIK treeningud
         try:
             date_str = datetime.fromisoformat(w.get('timestamp', w.get('date', '')).replace(' ', 'T')).strftime('%d.%m.%Y')
-        except:
+        except (ValueError, TypeError):
             date_str = w.get('date', '')[:10]
 
         name = w.get('workout_name', 'Treening')
@@ -474,7 +487,7 @@ def generate_fitness_knowledge():
             zones = w.get('hr_zones')
             total_zone_time = sum(zones.values())
             if total_zone_time > 0:
-                output.append(f"- **HR tsoonid:**\n")
+                output.append("- **HR tsoonid:**\n")
                 for zone, minutes in zones.items():
                     if minutes > 0:
                         percentage = (minutes / total_zone_time) * 100
@@ -482,7 +495,7 @@ def generate_fitness_knowledge():
 
         # Lisa harjutuste detailid (Gymaholic)
         if w.get('exercises') and len(w.get('exercises', [])) > 0:
-            output.append(f"\n**Harjutused:**\n")
+            output.append("\n**Harjutused:**\n")
             for ex in w.get('exercises', []):
                 ex_name = ex.get('name', 'Harjutus')
                 sets = ex.get('sets', 0)
@@ -534,28 +547,6 @@ def generate_fitness_knowledge():
     print(f"✅ Genereeritud: {OUTPUT_FILE}")
     print(f"📊 Kokku: {len(all_workouts)} treeningut")
     print(f"📄 Faili suurus: {OUTPUT_FILE.stat().st_size / 1024:.1f} KB")
-
-    # Upload to Google Drive (Claude Projects kaust)
-    try:
-        import subprocess
-        gdrive_folder = os.getenv('GDRIVE_CLAUDE_FOLDER', '_trenn_output')
-
-        # Loo kaust kui ei eksisteeri
-        subprocess.run(['rclone', 'mkdir', f'gdrive:{gdrive_folder}'],
-                      capture_output=True, check=False)
-
-        # Kopeeri fail
-        result = subprocess.run(
-            ['rclone', 'copy', str(OUTPUT_FILE), f'gdrive:{gdrive_folder}/'],
-            capture_output=True, text=True, timeout=30
-        )
-
-        if result.returncode == 0:
-            print(f"📤 Üles laaditud: gdrive:{gdrive_folder}/fitness_knowledge.md")
-        else:
-            print(f"⚠️  Google Drive upload ebaõnnestus: {result.stderr}")
-    except Exception as e:
-        print(f"⚠️  Google Drive upload ebaõnnestus: {e}")
 
     return OUTPUT_FILE
 
