@@ -24,3 +24,5 @@ claude_project/
 /*.gpx
 *.db
 *.db.bak*
+/*.gymdata
+*.gymdata
