@@ -22,6 +22,8 @@ Reeglid:
     - kaal võib olla komaga ("12,5 kg") -> 12.5; "0 kg" -> NULL (kaalu pole logitud)
     - TIME-veerg ("5:00", "1:30") -> sets.duration_sec
     - aasta puudub kuupäevast -> tuleta jooksvast
+    - sama trenn Stravast (strava_sync.py) on juba baasis -> CSV asendab selle
+      (täpsem pulss + märkmed); Strava harjutusepõhine pulss kantakse üle
 """
 import re
 import shutil
@@ -32,11 +34,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 import exercise_config as cfg
-from db import get_db, init_schema, local_naive_iso
+from db import find_workout_near, get_db, init_schema, local_naive_iso
 from validation import ValidationError, valid_duration_sec, valid_reps, valid_weight
 
 ROOT = Path(__file__).parent.parent
 FAILED = ROOT / "data" / "failed"
+
+# CSV algus on minuti täpsusega, Strava oma sekundi täpsusega; kaks jõutrenni 15 min sees ei alga
+STRENGTH_DEDUP_SEC = 15 * 60
 
 MONTHS = {
     "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
@@ -194,8 +199,16 @@ def _rep_range(raw):
     return lo, hi
 
 
-def save_to_db(parsed: dict, conn) -> tuple[int, str, str]:
-    """Kirjuta parsitud trenn SQLite-i. Idempotentne (INSERT OR IGNORE)."""
+def find_existing_strength(conn, ts_str: str, sources: tuple[str, ...] | None = None):
+    """Sama jõutrenn teisest allikast (CSV <-> Strava): algus ±15 min."""
+    return find_workout_near(conn, ts_str, STRENGTH_DEDUP_SEC, strength=True, sources=sources)
+
+
+def save_to_db(parsed: dict, conn, source: str = "gymaholic_csv") -> tuple[int, str, str]:
+    """Kirjuta parsitud trenn SQLite-i. Idempotentne (INSERT OR IGNORE).
+
+    parsed-struktuuri annavad nii parse_csv() kui strava_sync.parse_description().
+    """
     meta = parsed["meta"]
     if meta["date"] is None:
         raise ValidationError("kuupäev puudub või on parseerimatu")
@@ -216,7 +229,7 @@ def save_to_db(parsed: dict, conn) -> tuple[int, str, str]:
     # Kogu kirjutus ühe transaktsioonina: viga keskel (nt pärast DELETE FROM sets)
     # ei tohi jääda avatuks, muidu commitib järgmine fail pooliku seisu.
     try:
-        workout_id = _write_workout(parsed, conn, timestamp, date, wtype, total_vol)
+        workout_id = _write_workout(parsed, conn, timestamp, date, wtype, total_vol, source)
         conn.commit()
     except Exception:
         conn.rollback()
@@ -228,16 +241,34 @@ def save_to_db(parsed: dict, conn) -> tuple[int, str, str]:
     return workout_id, date, meta["name"]
 
 
+def _take_over_strava(conn, timestamp: str) -> dict[str, int]:
+    """Kustuta sama trenni Strava-kirje (CSV on täpsem). Tagasta {harjutus: avg_hr}.
+
+    Harjutusepõhine pulss on ainult Stravas — see kantakse CSV seeriatele üle.
+    """
+    twin = find_existing_strength(conn, timestamp, sources=("strava",))
+    if not twin:
+        return {}
+    hr = {r["exercise_name"]: r["avg_hr"] for r in conn.execute(
+        "SELECT exercise_name, avg_hr FROM sets WHERE workout_id=? AND avg_hr IS NOT NULL",
+        (twin["id"],))}
+    conn.execute("DELETE FROM sets WHERE workout_id=?", (twin["id"],))
+    conn.execute("DELETE FROM workouts WHERE id=?", (twin["id"],))
+    print(f"  ↻ Strava-kirje (id={twin['id']}) asendatud CSV-ga", file=sys.stderr)
+    return hr
+
+
 def _write_workout(parsed: dict, conn, timestamp: str, date: str,
-                   wtype: str, total_vol: float) -> int:
+                   wtype: str, total_vol: float, source: str = "gymaholic_csv") -> int:
     meta = parsed["meta"]
+    strava_hr = _take_over_strava(conn, timestamp) if source == "gymaholic_csv" else {}
     cur = conn.execute(
         """INSERT OR IGNORE INTO workouts
            (timestamp, date, workout_name, workout_type, duration_min,
             total_volume, avg_hr, kcal, source)
            VALUES (?,?,?,?,?,?,?,?,?)""",
         (timestamp, date, meta["name"], wtype, meta["duration_min"],
-         total_vol, meta["avg_hr"], meta["kcal"], "gymaholic_csv"),
+         total_vol, meta["avg_hr"], meta["kcal"], source),
     )
     if cur.rowcount == 0:
         row = conn.execute(
@@ -254,6 +285,7 @@ def _write_workout(parsed: dict, conn, timestamp: str, date: str,
         name = ex["name"]
         equip = cfg.equipment_for(name)
         note = "; ".join(ex.get("notes") or []) or None
+        ex_hr = ex.get("avg_hr") or strava_hr.get(name)
         for i, s in enumerate(ex["sets"], 1):
             w = s.get("weight")
             reps = s.get("reps")
@@ -272,9 +304,9 @@ def _write_workout(parsed: dict, conn, timestamp: str, date: str,
             conn.execute(
                 """INSERT INTO sets
                    (workout_id, exercise_name, set_number, reps, weight_kg,
-                    equipment, total_volume, duration_sec, note)
-                   VALUES (?,?,?,?,?,?,?,?,?)""",
-                (workout_id, name, i, reps, w, equip, vol, dur, note),
+                    equipment, total_volume, duration_sec, avg_hr, note)
+                   VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                (workout_id, name, i, reps, w, equip, vol, dur, ex_hr, note),
             )
         # sünkro rep-vahemik exercises tabelisse (CSV = uusim tõde)
         rmin, rmax = _rep_range(ex.get("rep_range"))

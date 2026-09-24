@@ -8,14 +8,18 @@ Do not read, touch or access anything outside of this directory.
 
 ## Andmevoog
 ```
-Trenni järel: jaga Gymaholicu ÜKSIK-TRENNI CSV otse Discordis Kratile
-  → v2/parse_gymaholic_csv.py  (parse + valideeri)
+Automaatne (põhitee, 24.09.2026): Gymaholic → Strava → v2/strava_sync.py (cron)
+  → jõutrenn: Strava kirjelduse seeriad ("3x10 @ 55kg"), kontrollsumma = Total weight
+  → kardio: Strava 1 s pulsivoog → tsoonid
+  → data/trenn.db → render_html → öine push
+
+Valikuline täpsustus / varutee: jaga Gymaholicu ÜKSIK-TRENNI CSV Discordis Kratile
+  → v2/parse_gymaholic_csv.py  (parse + valideeri; ASENDAB sama trenni Strava-kirje)
   → data/trenn.db              (SQLite, üks tõeallikas)
   → v2/render_html.py          (mobile-first HTML → site/index.html)
   → git push                   (GitHub Pages deploy'b AINULT site/ kausta)
 
-Kardio: FIT-fail → v2/parse_fit.py
-Kardio: GPX/XML → v2/parse_gpx.py
+Kardio käsitsi: FIT-fail → v2/parse_fit.py, GPX/XML → v2/parse_gpx.py
 
 Lives trenni ajal (Kratt Discordis):
   → v2/kratt_tools.py last/history   ("mis oli eelmine bench?")
@@ -33,11 +37,19 @@ Lives trenni ajal (Kratt Discordis):
 - `analyze.py` — **progressioon-teadlik** analüüs (kaal↑+kordused↓=areng; varustusvahetus=neutraalne)
 - `render_html.py` + `template.html` — HTML generaator (Chart.js, drill-down)
 - `kratt_tools.py` — Kratti read/write CLI
+- `strava_api.py` — Strava OAuth + GET (urllib); token `data/strava_token.json` (0600, refresh token vahetub igal uuendusel)
+- `strava_sync.py` — Strava → baas. `auth [--code]`, `sync [--days 14] [--dry-run] [--activity ID] [--retry-failed]`; teavitus `TRENN_DISCORD_WEBHOOK`
+  - Gymaholicu Strava-kirjeldusel on seeriad alles **alates 18.05.2026**; varem ainult kokkuvõte ("Exercises: 7") → vanu ei saa Stravast taastada
+  - Gymaholic jätab üksikuid trenne Stravasse saatmata (28.05.2026 Trenn B puudub) → CSV jääb varuteeks
+  - Jõutrennil ~1 pulsipunkt harjutuse kohta → `sets.avg_hr`; Strava keskmine pulss ~4 lööki madalam kui Gymaholicu oma
+  - Dedup ajaaknaga (`db.find_workout_near`): jõutrenn ±15 min, kardio ±2 min (FIT ja Strava algus erinevad ~1 s)
 
 ## Andmebaas (data/trenn.db)
 - `workouts` — sessioonid (UNIQUE timestamp+name = dedup)
 - `sets` — üksikseeriad. `weight_kg=NULL` = kaalu pole logitud (EI 0.0!)
 - `exercises` — vaikevarustus, rep-vahemikud, lihasgrupp
+- `strava_activities` — sünkrologi (activity_id → status imported/duplicate/skipped/failed); failed-e ei proovita uuesti ilma `--retry-failed`-ita
+- `workouts.source`: `gymaholic_csv` / `strava` / `fit` / `gpx` / `gymaholic` (v1 legacy)
 - Rekordid arvutatakse päringuga (`queries.compute_prs`), EI salvestata eraldi
 
 ## HTML väljund (mobile-first, drill-down)

@@ -1,9 +1,11 @@
-"""Trenn 2.0 — FIT ja GPX parseri jagatud osad.
+"""Trenn 2.0 — kardio-importerite (FIT, GPX, Strava) jagatud osad.
 
 Üks tõeallikas spordinimedele, kardio dedup-võtmele ja failinime puhastusele.
 (Esimene samm FIT/GPX ~70 % copy-paste'i koondamisel; vt plaan Faas 4.)
 """
 import re
+
+from db import find_workout_near
 
 SPORT_MAP = {
     "walking": "kõndimine",
@@ -16,7 +18,20 @@ SPORT_MAP = {
     "other": "kardio",
 }
 
-CARDIO_SOURCES = ("fit", "gpx")
+# Strava sport_type -> SPORT_MAP võti
+STRAVA_SPORT = {
+    "Walk": "walking",
+    "Hike": "hiking",
+    "Run": "running", "TrailRun": "running", "VirtualRun": "running",
+    "Ride": "cycling", "VirtualRide": "cycling", "EBikeRide": "cycling",
+    "MountainBikeRide": "cycling", "GravelRide": "cycling", "EMountainBikeRide": "cycling",
+    "Swim": "swimming",
+    "Rowing": "other", "VirtualRow": "other", "Elliptical": "other", "StairStepper": "other",
+}
+
+CARDIO_SOURCES = ("fit", "gpx", "strava")
+# FIT ja Strava sama tegevuse algus erineb ~1 s; kaks eri kardiotrenni 2 min sees ei alga
+CARDIO_DEDUP_SEC = 120
 
 _ARCHIVE_PREFIX = re.compile(r"^\d{8}_\d{6}_")
 _DUP_SUFFIX = re.compile(r"_\d+$")
@@ -38,11 +53,11 @@ def clean_cardio_name(stem: str) -> str:
 
 
 def find_existing_cardio(conn, ts_str: str):
-    """Kardio dedup-võti on ALGUSHETK + allikas (mitte failinimi, mis arhiveerimisel muutub)."""
-    return conn.execute(
-        "SELECT id FROM workouts WHERE timestamp=? AND source IN (?,?)",
-        (ts_str, *CARDIO_SOURCES),
-    ).fetchone()
+    """Kardio dedup-võti on ALGUSHETK ±2 min (mitte failinimi, mis arhiveerimisel muutub).
+
+    Allikast sõltumatu: sama matk FIT-ist ja Stravast on üks trenn.
+    """
+    return find_workout_near(conn, ts_str, CARDIO_DEDUP_SEC, strength=False)
 
 
 def cardio_insert_values(ts_str: str, workout_name: str, sport: str, data: dict,

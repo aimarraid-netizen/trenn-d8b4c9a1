@@ -68,10 +68,26 @@ CREATE TABLE IF NOT EXISTS exercises (
     muscle_group TEXT
 );
 
+-- Strava sünkroniseerimise logi: iga tegevus töödeldakse üks kord.
+-- workout_id ilma FK-ta — hiljem saadetud CSV võib Strava-kirje asendada.
+CREATE TABLE IF NOT EXISTS strava_activities (
+    activity_id INTEGER PRIMARY KEY,
+    start_local TEXT,
+    sport_type TEXT,
+    name TEXT,
+    status TEXT NOT NULL,     -- imported / duplicate / skipped / failed
+    workout_id INTEGER,
+    error TEXT,
+    synced_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_sets_workout ON sets(workout_id);
 CREATE INDEX IF NOT EXISTS idx_sets_exercise ON sets(exercise_name);
 CREATE INDEX IF NOT EXISTS idx_workouts_date ON workouts(date);
 """
+
+# Jõutrenni tüübid (parse_gymaholic_csv._workout_type); kõik muu on kardio.
+STRENGTH_TYPES = ("jõusaal", "kodune")
 
 
 def get_db(db_path=None) -> "sqlite3.Connection":
@@ -121,6 +137,28 @@ def to_local_iso(dt: datetime) -> str:
 def local_naive_iso(dt: datetime) -> str:
     """Juba lokaalajas oleva naive datetime'i formaat (CSV-parser)."""
     return dt.strftime(TS_FMT)
+
+
+def find_workout_near(conn, ts_str: str, window_sec: int, *, strength: bool,
+                      sources: tuple[str, ...] | None = None):
+    """Lähim sama liiki trenn, mille algus on ts_str-ist kuni window_sec kaugusel.
+
+    Allikad annavad sama trenni algushetke erinevalt: CSV minuti täpsusega, FIT ja
+    Strava sekundi täpsusega ja omavahel ~1 s nihkes — täpne võrdlus ei tööta.
+    """
+    ph = ",".join("?" * len(STRENGTH_TYPES))
+    where = f"workout_type {'IN' if strength else 'NOT IN'} ({ph})"
+    params: tuple = STRENGTH_TYPES
+    if sources:
+        where += f" AND source IN ({','.join('?' * len(sources))})"
+        params += tuple(sources)
+    return conn.execute(
+        f"""SELECT id, source, workout_name, timestamp FROM workouts
+            WHERE {where}
+              AND abs(julianday(timestamp) - julianday(?)) * 86400 <= ?
+            ORDER BY abs(julianday(timestamp) - julianday(?)) LIMIT 1""",
+        (*params, ts_str, window_sec, ts_str),
+    ).fetchone()
 
 
 if __name__ == "__main__":
