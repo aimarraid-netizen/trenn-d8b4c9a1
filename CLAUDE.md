@@ -8,13 +8,8 @@ Do not read, touch or access anything outside of this directory.
 
 ## Andmevoog
 ```
-Automaatne (põhitee, 24.09.2026): Gymaholic → Strava → v2/strava_sync.py (cron)
-  → jõutrenn: Strava kirjelduse seeriad ("3x10 @ 55kg"), kontrollsumma = Total weight
-  → kardio: Strava 1 s pulsivoog → tsoonid
-  → data/trenn.db → render_html → öine push
-
-Valikuline täpsustus / varutee: jaga Gymaholicu ÜKSIK-TRENNI CSV Discordis Kratile
-  → v2/parse_gymaholic_csv.py  (parse + valideeri; ASENDAB sama trenni Strava-kirje)
+Trenni järel: jaga Gymaholicu ÜKSIK-TRENNI CSV otse Discordis Kratile
+  → v2/parse_gymaholic_csv.py  (parse + valideeri; asendab sama trenni Strava-kirje, kui on)
   → data/trenn.db              (SQLite, üks tõeallikas)
   → v2/render_html.py          (mobile-first HTML → site/index.html)
   → git push                   (GitHub Pages deploy'b AINULT site/ kausta)
@@ -39,6 +34,10 @@ Lives trenni ajal (Kratt Discordis):
 - `kratt_tools.py` — Kratti read/write CLI
 - `strava_api.py` — Strava OAuth + GET (urllib); token `data/strava_token.json` (0600, refresh token vahetub igal uuendusel)
 - `strava_sync.py` — Strava → baas. `auth [--code]`, `sync [--days 14] [--dry-run] [--activity ID] [--retry-failed]`; teavitus `TRENN_DISCORD_WEBHOOK`
+  - **OOTEL (24.09.2026):** Strava API vajab alates 06.2026 tasulist Strava tellimust (API-rakendust ei saa ilma luua).
+    Aimar otsustas: CSV jääb põhiteeks, kood jääb ootele. Sisselülitamine: tellimus → strava.com/settings/api
+    (callback domain `localhost`) → `.env` STRAVA_CLIENT_ID/SECRET → `auth` → `sync --dry-run` → cron.
+    Parser + dedup on päris kirjelduste vastu testitud (9 jõutrenni, kõik seeriad klappisid).
   - Gymaholicu Strava-kirjeldusel on seeriad alles **alates 18.05.2026**; varem ainult kokkuvõte ("Exercises: 7") → vanu ei saa Stravast taastada
   - Gymaholic jätab üksikuid trenne Stravasse saatmata (28.05.2026 Trenn B puudub) → CSV jääb varuteeks
   - Jõutrennil ~1 pulsipunkt harjutuse kohta → `sets.avg_hr`; Strava keskmine pulss ~4 lööki madalam kui Gymaholicu oma
