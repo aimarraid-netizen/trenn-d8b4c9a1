@@ -8,10 +8,10 @@ Do not read, touch or access anything outside of this directory.
 
 ## Andmevoog
 ```
-PÕHITEE alates 26.09.2026: Hevy (Pro, API)
-  → v2/hevy_sync.py sync       (events alates viimasest sünkist; muudetud/kustutatud trenn ka baasis)
+PÕHITEE alates 26.09.2026: Hevy (Pro, API) — trenn logitakse Hevy rutiinist, Finish
+  → v2/hevy_cron.sh (iga 15 min) → v2/hevy_sync.py sync --quiet
   → data/trenn.db (source='hevy', toor-JSON hevy_workouts.raw_json)
-  → render_html → git push
+  → OttBot (Discordi webhook) kokkuvõte + render_html → öine git push 02:15
 
 VARUTEE: jaga Gymaholicu ÜKSIK-TRENNI CSV otse Discordis Kratile
   → v2/parse_gymaholic_csv.py  (parse + valideeri; asendab sama trenni Strava-kirje, kui on)
@@ -21,7 +21,7 @@ VARUTEE: jaga Gymaholicu ÜKSIK-TRENNI CSV otse Discordis Kratile
 
 Kardio käsitsi: FIT-fail → v2/parse_fit.py, GPX/XML → v2/parse_gpx.py
 
-Lives trenni ajal (Kratt Discordis):
+Lives trenni ajal (Kratt Discordis) — Hevy "Previous" veerg teeb sama, seega vähetähtis:
   → v2/kratt_tools.py last/history   ("mis oli eelmine bench?")
   → v2/kratt_tools.py equip/note     ("Face Pull täna masin")
 ```
@@ -40,13 +40,22 @@ Lives trenni ajal (Kratt Discordis):
 - `hevy_api.py` — Hevy public API v1 (päis `api-key`, `.env` HEVY_API_KEY; beetas → toor-JSON salvestatakse)
 - `hevy_sync.py` — `check` / `sync [--dry-run] [--all] [--retry-failed]` / `map` / `rebuild` (raw_json-ist uuesti pärast vastete muutust)
   - Harjutuste vasted `exercise_config.HEVY_TEMPLATES` (meie nimi → Hevy nimi + template id, kontrollitud 25.09.2026); tundmatu Hevy nimi jääb Hevy omaks + hoiatus
-  - Varustus Hevy nime sulgudest ("(Cable)" → cable), muidu meie vaikevarustus (Face Pull → trx)
+  - Varustus Hevy nime sulgudest ("(Cable)" → cable), muidu meie vaikevarustus (Face Pull → trx).
+    Hevy template'i `equipment` väli ütleb kaablile "machine" → seda EI kasutata
   - Soojendusseeriad (type=warmup) EI lähe `sets`-i (progressioon/PR); on raw_json-is
   - Dedup: Hevy vs CSV/Strava ±15 min → kes enne tuli, jääb; CSV import keeldub, kui Hevy-kirje on olemas
   - Hevy API EI anna pulssi ega kcal-i
-  - Cron veel POLE — alles pärast paari käsitsi sünki (Hevy palub mitte pärida täpselt xx:00)
-- **OttBot** = Discordi webhook (`TRENN_DISCORD_WEBHOOK`), ainult väljund. Persona `data/ottbot.md` (gitist väljas; Aimar muudab filebrowseriga). Sõnum: võrdlus eelmise korraga + järgmise korra kaalud + nädala seis x/3
-- `hevy_routines.py` — `.gymdata` kava → Hevy rutiinid (`--push`; sama nimega rutiin uuendatakse). Kaal/vahemik/soojendus loetakse kavamärkustest
+  - Cron: `v2/hevy_cron.sh` (flock + `--quiet`, logi `logs/hevy_sync.log` ainult muutustel), rida
+    `7,22,37,52 * * * * /home/aimar/projects/trenn/v2/hevy_cron.sh` — sisse pärast esimest kontrollitud sünki (vt STATUS.md).
+    Hevy palub mitte pärida täpselt xx:00. API: pageSize max 10 (templates 100)
+  - Hevy webhook (seadetes olemas, saadab Finish'il ainult workoutId, ootab 200 <5 s) — EI kasuta (otsus 25.09.2026):
+    vajab avalikku HTTPS-i (ubu pordid kinni → tunnel), ei kata muutmist/kustutamist. Cron 15 min on piisav
+- **OttBot** = Discordi webhook (`TRENN_DISCORD_WEBHOOK`, nimi Discordis OttBot), ainult väljund — vastuseid ei loe (vestlus = Kratt).
+  Persona `data/ottbot.md` (gitist väljas; Aimar muudab filebrowseriga): treener, otsekohene, 2–6 rida, 1–3 teravmeelset nalja
+  (must huumor + röst lubatud, AINULT trenni/soorituse kohta). Sisu: võrdlus eelmise korraga + järgmise korra kaalud + nädala seis.
+  Teostus (PLAAN, pole ehitatud): numbrid arvutab kood, Claude API ainult sõnastab (`.env` ANTHROPIC_API_KEY); API vea korral mallisõnum
+- `hevy_routines.py` — `.gymdata` kava → Hevy rutiinid (`--push`; sama nimega rutiin uuendatakse). Kaal/vahemik/soojendus loetakse kavamärkustest.
+  25.09.2026 loodud "Trenn A — N1", "Trenn B — N1". API jätab rutiini üldmärkuse tühjaks → juhised harjutuse märkusesse
 - `strava_api.py` — Strava OAuth + GET (urllib); token `data/strava_token.json` (0600, refresh token vahetub igal uuendusel)
 - `strava_sync.py` — Strava → baas. `auth [--code]`, `sync [--days 14] [--dry-run] [--activity ID] [--retry-failed]`; teavitus `TRENN_DISCORD_WEBHOOK`
   - **ASENDATUD Hevyga (25.09.2026)**; varasem ootel-märge: Strava API vajab alates 06.2026 tasulist Strava tellimust (API-rakendust ei saa ilma luua).
@@ -88,10 +97,21 @@ Legacy v1 skriptid on eemaldatud. Kasuta ainult `v2/` mooduleid ja `pipeline.sh`
 
 ## Conventions
 - Vasta eesti keeles
-- Sisend = üksik-trenni CSV otse Discordi Kratile (EI Google Drive)
+- Sisend = Hevy (põhitee alates 26.09.2026); varutee üksik-trenni CSV otse Discordi Kratile (EI Google Drive)
 - Idempotentsus: sama fail 2× ei tee duplikaate (INSERT OR IGNORE + DELETE+reinsert seeriatele)
 - Enne suuri muudatusi: backup data/trenn.db
 
+
+## Seis 25.09.2026 — Hevy
+
+- Aimaril Hevy Pro (25.09.2026) → Hevy on põhitee; Gymaholic CSV/`.gymdata` varuteeks, maha Faas 2-s kui Hevy 2–3 näd stabiilne.
+- **Teadaolev viga:** `analyze.workout_analysis` märgib pärast pikka pausi kõik harjutused "uus" ja insight on tühi
+  ("Korralik sessioon…"). Vaja: võrdlus viimase pausieelse sessiooniga + kava täitmine (plaan 2 seeriat, tehti 3). Parandada koos OttBotiga.
+- **Prioriteedid (Aimar 25.09):** 1+2 koos = automaatne progressioon (analüüs → järgmise korra kaalud → Hevy rutiin PUT)
+  + OttBoti sõnum (samad numbrid) → 3 "3 trenni/näd" valvur Discordi → hiljem: kehakaal (Hevy `body_measurements`),
+  RPE → RIR-põhine progressioon, ajaloo backfill Hevysse (ENNE testi 1 trenniga — Hevy võib edasi saata Strava/Health'i).
+- Faas 3A Kratti lives-käsud (`last/history/equip`) kaotasid tähtsuse — Hevy näitab eelmist tulemust ise.
+- Pooleli olev töö ja järgmised sammud: `STATUS.md`.
 
 ## Seis 02.09.2026 ja järgmised faasid
 
