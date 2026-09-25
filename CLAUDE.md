@@ -45,6 +45,7 @@ Lives trenni ajal (Kratt Discordis):
   - Dedup: Hevy vs CSV/Strava ±15 min → kes enne tuli, jääb; CSV import keeldub, kui Hevy-kirje on olemas
   - Hevy API EI anna pulssi ega kcal-i
   - Cron veel POLE — alles pärast paari käsitsi sünki (Hevy palub mitte pärida täpselt xx:00)
+- **OttBot** = Discordi webhook (`TRENN_DISCORD_WEBHOOK`), ainult väljund. Persona `data/ottbot.md` (gitist väljas; Aimar muudab filebrowseriga). Sõnum: võrdlus eelmise korraga + järgmise korra kaalud + nädala seis x/3
 - `hevy_routines.py` — `.gymdata` kava → Hevy rutiinid (`--push`; sama nimega rutiin uuendatakse). Kaal/vahemik/soojendus loetakse kavamärkustest
 - `strava_api.py` — Strava OAuth + GET (urllib); token `data/strava_token.json` (0600, refresh token vahetub igal uuendusel)
 - `strava_sync.py` — Strava → baas. `auth [--code]`, `sync [--days 14] [--dry-run] [--activity ID] [--retry-failed]`; teavitus `TRENN_DISCORD_WEBHOOK`
