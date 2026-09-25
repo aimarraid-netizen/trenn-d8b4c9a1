@@ -81,6 +81,20 @@ CREATE TABLE IF NOT EXISTS strava_activities (
     synced_at TEXT NOT NULL
 );
 
+-- Hevy sünkroniseerimise logi (v2/hevy_sync.py). raw_json = trenn nagu API andis
+-- (soojendused, RPE, kirjeldus) -> saab ilma API-ta uuesti töödelda (hevy_sync rebuild).
+CREATE TABLE IF NOT EXISTS hevy_workouts (
+    hevy_id TEXT PRIMARY KEY,
+    start_local TEXT,
+    title TEXT,
+    updated_at TEXT,
+    status TEXT NOT NULL,     -- imported / duplicate / failed / deleted
+    workout_id INTEGER,
+    error TEXT,
+    raw_json TEXT,
+    synced_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_sets_workout ON sets(workout_id);
 CREATE INDEX IF NOT EXISTS idx_sets_exercise ON sets(exercise_name);
 CREATE INDEX IF NOT EXISTS idx_workouts_date ON workouts(date);

@@ -3,6 +3,7 @@
 Need on alglaadimiseks. CSV-st tulevad rep-vahemikud kirjutavad hiljem üle
 (CSV = uusim tõde). default_equipment on Kratti lives-muudatuste lähtepunkt.
 """
+import re
 
 # Vaikevarustus harjutuse kohta.
 # trx = TRX-rihmad/kehakaal, machine = masin, cable = kaabel,
@@ -99,6 +100,43 @@ CARDIO_EXERCISES = {
 TIME_BASED = {
     "Plank",
 }
+
+
+# Hevy harjutuse nimi -> meie nimi. Ilma vasteta tekiks uus harjutus ja
+# progressioon/PR-id katkeksid. Täida `hevy_sync.py map` väljundi põhjal.
+# Väärtus: nimi või (nimi, varustus), kui nime sulgudest tuletatud varustus ei sobi.
+HEVY_NAMES: dict[str, str | tuple[str, str]] = {
+}
+
+# Hevy nime sulgudes olev varustus -> meie sõnavara (sets.equipment)
+HEVY_EQUIPMENT = {
+    "barbell": "barbell",
+    "dumbbell": "dumbbell",
+    "cable": "cable",
+    "machine": "machine",
+    "smith machine": "machine",
+    "bodyweight": "bodyweight",
+    "suspension": "trx",
+    "trx": "trx",
+}
+
+
+def from_hevy(title: str) -> tuple[str, str | None, bool]:
+    """Hevy harjutuse nimi -> (meie nimi, varustus, kas vaste on teada).
+
+    Tundmatu nimi jääb Hevy omaks (andmed ei kao) — `hevy_sync.py rebuild`
+    kirjutab need pärast HEVY_NAMES täiendamist ümber.
+    """
+    m = re.search(r"\(([^)]+)\)\s*$", title)
+    suffix_equip = HEVY_EQUIPMENT.get(m.group(1).strip().lower()) if m else None
+    mapped = HEVY_NAMES.get(title)
+    if isinstance(mapped, tuple):
+        return mapped[0], mapped[1], True
+    if mapped:
+        return mapped, suffix_equip or equipment_for(mapped), True
+    if title in MUSCLE_GROUP:
+        return title, suffix_equip or equipment_for(title), True
+    return title, suffix_equip, False
 
 
 def equipment_for(name: str) -> str | None:

@@ -218,6 +218,11 @@ def save_to_db(parsed: dict, conn, source: str = "gymaholic_csv") -> tuple[int, 
     timestamp = local_naive_iso(dt)   # CSV kuupäev on juba lokaalaeg
     date = timestamp[:10]
     wtype = _workout_type(meta["name"] or "")
+    if source == "gymaholic_csv":
+        twin = find_existing_strength(conn, timestamp, sources=("hevy",))
+        if twin:
+            raise ValidationError(f"sama trenn on juba Hevyst imporditud "
+                                  f"({twin['timestamp']} {twin['workout_name']}, id={twin['id']})")
 
     # arvuta total_volume
     total_vol = 0.0
@@ -283,7 +288,8 @@ def _write_workout(parsed: dict, conn, timestamp: str, date: str,
 
     for ex in parsed["exercises"]:
         name = ex["name"]
-        equip = cfg.equipment_for(name)
+        # Hevy annab varustuse harjutuse nimes ("Face Pull (Cable)") -> ülekirjutus
+        equip = ex.get("equipment") or cfg.equipment_for(name)
         note = "; ".join(ex.get("notes") or []) or None
         ex_hr = ex.get("avg_hr") or strava_hr.get(name)
         for i, s in enumerate(ex["sets"], 1):
