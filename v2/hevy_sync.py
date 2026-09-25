@@ -17,7 +17,8 @@ varasem kirje jääb. CSV import omakorda keeldub, kui Hevy-kirje on olemas.
 
 CLI (ubu terminalis, kaustas ~/projects/trenn):
   venv/bin/python v2/hevy_sync.py check                 # võtme test
-  venv/bin/python v2/hevy_sync.py sync [--dry-run] [--no-html] [--retry-failed] [--all]
+  venv/bin/python v2/hevy_sync.py sync [--dry-run] [--no-html] [--retry-failed] [--all] [--quiet]
+  v2/hevy_cron.sh                                       # cron: lukk + logi (logs/hevy_sync.log)
   venv/bin/python v2/hevy_sync.py map                   # Hevy nimed vs meie nimed
   venv/bin/python v2/hevy_sync.py rebuild [--dry-run]   # raw_json-ist uuesti (pärast HEVY_NAMES muutust)
 """
@@ -316,6 +317,7 @@ def main() -> None:
     s.add_argument("--no-html", action="store_true", help="ära regenereeri HTML-i")
     s.add_argument("--retry-failed", action="store_true", help="proovi failed-trenne uuesti")
     s.add_argument("--all", action="store_true", help="kogu ajalugu, mitte ainult uued")
+    s.add_argument("--quiet", action="store_true", help="muutusteta käivitus ei prindi midagi (cron)")
     sub.add_parser("map", help="Hevy harjutusnimed vs meie nimed")
     r = sub.add_parser("rebuild", help="töötle salvestatud trennid uuesti (pärast HEVY_NAMES muutust)")
     r.add_argument("--dry-run", action="store_true")
@@ -347,9 +349,12 @@ def main() -> None:
         init_schema(conn)
         results = sync(conn, client, args.dry_run, args.retry_failed,
                        since=EPOCH if args.all else None)
+        if args.quiet and not results:
+            conn.close()
+            return
         n_new, n_fail = _print(results, args.dry_run)
-        print(f"— {len(results)} muudatust: {n_new} baasi, {n_fail} viga "
-              f"({client.calls} API päringut)")
+        print(f"— {datetime.now():%d.%m.%Y %H:%M} · {len(results)} muudatust: {n_new} baasi, "
+              f"{n_fail} viga ({client.calls} API päringut)")
         if not args.dry_run:
             notify(_discord_lines(results))
             if n_new and not args.no_html:

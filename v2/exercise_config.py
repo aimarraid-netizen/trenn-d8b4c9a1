@@ -102,10 +102,46 @@ TIME_BASED = {
 }
 
 
-# Hevy harjutuse nimi -> meie nimi. Ilma vasteta tekiks uus harjutus ja
-# progressioon/PR-id katkeksid. Täida `hevy_sync.py map` väljundi põhjal.
-# Väärtus: nimi või (nimi, varustus), kui nime sulgudest tuletatud varustus ei sobi.
+# Meie nimi -> (Hevy nimi, Hevy exercise_template_id). Kontrollitud Hevy
+# /exercise_templates vastu 25.09.2026. Sünk loeb nime, kava ülekanne (hevy_routines) ID-d.
+# Ilma vasteta tekiks uus harjutus ja progressioon/PR-id katkeksid.
+HEVY_TEMPLATES = {
+    "Barbell Bench Press": ("Bench Press (Barbell)", "79D0BB3A"),
+    "Barbell Curl": ("Bicep Curl (Barbell)", "A5AC6449"),
+    "Barbell Squat": ("Squat (Barbell)", "D04AC939"),
+    "Bent Over Barbell Row": ("Bent Over Row (Barbell)", "55E6546F"),
+    "Face Pull": ("Face Pull", "BE640BA0"),
+    "Incline Dumbbell Press": ("Incline Bench Press (Dumbbell)", "07B38369"),
+    "Lunge": ("Lunge", "5E1A7777"),
+    "Lying Leg Raise": ("Lying Leg Raise", "09C9F635"),
+    "Lying Triceps Press": ("Skullcrusher (Barbell)", "875F585F"),
+    "One-Arm Dumbbell Row": ("Dumbbell Row", "F1E57334"),
+    "Plank": ("Plank", "C6C9B8A0"),
+    "Romanian Deadlift": ("Romanian Deadlift (Barbell)", "2B4B7310"),
+    "Rowing With Rowing Ergometer": ("Rowing Machine", "0222DB42"),
+    "Seated Cable Rows": ("Seated Cable Row - V Grip (Cable)", "0393F233"),
+    "Seated Hammer Curls": ("Hammer Curl (Dumbbell)", "7E3BC8B6"),
+    "Seated Triceps Press": ("Triceps Extension (Dumbbell)", "3765684D"),
+    "Shoulder Press": ("Shoulder Press (Dumbbell)", "878CD1D0"),
+    "Side Lateral Raise": ("Lateral Raise (Dumbbell)", "422B08F1"),
+    "Single-Leg Press": ("Single Leg Press (Machine)", "3FD83744"),
+    "Standing Calf Raise": ("Standing Calf Raise (Machine)", "E05C2C38"),
+    "Triceps Dips": ("Triceps Dip", "28BB4A95"),
+    "Triceps Pushdown with Rope": ("Triceps Rope Pushdown", "94B7239B"),
+    "Walking On Treadmill": ("Treadmill", "243710DE"),
+    "Wide-Grip Lat Pulldown": ("Lat Pulldown (Cable)", "6A6C31A5"),
+    "Dumbbell Flyes": ("Chest Fly (Dumbbell)", "12017185"),
+    "Reverse Flyes": ("Rear Delt Reverse Fly (Dumbbell)", "E5988A0A"),
+    "Lying Leg Curls": ("Lying Leg Curl (Machine)", "B8127AD1"),
+    "Running": ("Running", "AC1BB830"),
+    "Leg Extensions": ("Leg Extension (Machine)", "75A4F6C4"),
+    "Single-Leg Leg Extension": ("Single Leg Extensions", "629AE73D"),
+}
+
+# Hevy harjutuse nimi -> meie nimi. Käsitsi lisa siia väljaspool HEVY_TEMPLATES
+# olevad (nt teine varustus); väärtus võib olla (nimi, varustus).
 HEVY_NAMES: dict[str, str | tuple[str, str]] = {
+    title: ours for ours, (title, _) in HEVY_TEMPLATES.items()
 }
 
 # Hevy nime sulgudes olev varustus -> meie sõnavara (sets.equipment)

@@ -40,8 +40,18 @@ class HevyClient:
         url = f"{API}{path}"
         if params:
             url += "?" + urllib.parse.urlencode(params)
-        req = urllib.request.Request(url, headers={
-            "api-key": self.key, "Accept": "application/json", "User-Agent": "trenn-hevy-sync"})
+        return self._send(urllib.request.Request(url), path)
+
+    def _write(self, method: str, path: str, body: dict) -> dict:
+        req = urllib.request.Request(f"{API}{path}", method=method,
+                                     data=json.dumps(body).encode(),
+                                     headers={"Content-Type": "application/json"})
+        return self._send(req, path, not_found_ok=False)
+
+    def _send(self, req: urllib.request.Request, path: str, not_found_ok: bool = True) -> dict:
+        req.add_header("api-key", self.key)
+        req.add_header("Accept", "application/json")
+        req.add_header("User-Agent", "trenn-hevy-sync")
         for attempt in range(3):
             self.calls += 1
             try:
@@ -53,7 +63,7 @@ class HevyClient:
                     continue
                 if e.code == 401:
                     raise HevyError("401: API-võti vale või Hevy Pro aegunud") from None
-                if e.code == 404:
+                if e.code == 404 and not_found_ok:
                     # lehekülg üle viimase annab 404 — tühi, mitte viga
                     return {}
                 raise HevyError(f"{e.code} {path}: {e.read()[:200]!r}") from None
@@ -93,3 +103,9 @@ class HevyClient:
 
     def routines(self):
         return self._pages("/routines", "routines")
+
+    def create_routine(self, routine: dict) -> dict:
+        return self._write("POST", "/routines", {"routine": routine})
+
+    def update_routine(self, routine_id: str, routine: dict) -> dict:
+        return self._write("PUT", f"/routines/{routine_id}", {"routine": routine})

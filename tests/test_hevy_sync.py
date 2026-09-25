@@ -180,3 +180,33 @@ def test_failed_on_bad_format_and_rebuild_after_mapping(conn, monkeypatch):
 def test_suggest_normalizes_equipment_words():
     assert hs.suggest("Romanian Deadlift (Barbell)") == ["Romanian Deadlift"]
     assert hs.suggest("Lying Leg Curl (Machine)") == ["Lying Leg Curls"]
+
+
+# ---------- kava -> Hevy rutiin ----------
+
+def test_to_routine_weights_ranges_warmups():
+    import gymdata
+    import hevy_routines as hr
+    wo = gymdata.workout("Trenn X", "märkus", [
+        gymdata.plan(1, "Rowing With Rowing Ergometer", seconds=300),
+        gymdata.plan(2, "Barbell Squat", 2, 8, 120,
+                     notes=["40 kg. 6–10 reps. Enne tööseeriaid: tühi kang ×10, ~60% ×5."]),
+        gymdata.plan(3, "Leg Extensions", 2, 10, 90, notes=["10–15 reps."]),
+    ])
+    r = hr.to_routine(wo)
+    assert r["title"] == "Trenn X"
+    row, squat, ext = r["exercises"]
+    assert row["exercise_template_id"] == "0222DB42" and row["sets"] == [
+        {"type": "normal", "duration_seconds": 300}]
+    assert [(s["type"], s["weight_kg"], s["reps"]) for s in squat["sets"]] == [
+        ("warmup", 20, 10), ("warmup", 25.0, 5), ("normal", 40.0, 8), ("normal", 40.0, 8)]
+    assert squat["sets"][-1]["rep_range"] == {"start": 6, "end": 10}
+    assert squat["rest_seconds"] == 120
+    assert ext["sets"][0]["weight_kg"] is None and len(ext["sets"]) == 2
+
+
+def test_hevy_templates_roundtrip():
+    # iga Hevy nimi viib tagasi samale meie nimele (sünk ja kava ülekanne klapivad)
+    for ours, (title, _) in cfg.HEVY_TEMPLATES.items():
+        assert cfg.from_hevy(title)[0] == ours
+        assert ours in cfg.MUSCLE_GROUP

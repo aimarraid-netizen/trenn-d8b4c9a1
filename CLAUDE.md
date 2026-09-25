@@ -8,7 +8,12 @@ Do not read, touch or access anything outside of this directory.
 
 ## Andmevoog
 ```
-Trenni järel: jaga Gymaholicu ÜKSIK-TRENNI CSV otse Discordis Kratile
+PÕHITEE alates 26.09.2026: Hevy (Pro, API)
+  → v2/hevy_sync.py sync       (events alates viimasest sünkist; muudetud/kustutatud trenn ka baasis)
+  → data/trenn.db (source='hevy', toor-JSON hevy_workouts.raw_json)
+  → render_html → git push
+
+VARUTEE: jaga Gymaholicu ÜKSIK-TRENNI CSV otse Discordis Kratile
   → v2/parse_gymaholic_csv.py  (parse + valideeri; asendab sama trenni Strava-kirje, kui on)
   → data/trenn.db              (SQLite, üks tõeallikas)
   → v2/render_html.py          (mobile-first HTML → site/index.html)
@@ -32,9 +37,18 @@ Lives trenni ajal (Kratt Discordis):
 - `analyze.py` — **progressioon-teadlik** analüüs (kaal↑+kordused↓=areng; varustusvahetus=neutraalne)
 - `render_html.py` + `template.html` — HTML generaator (Chart.js, drill-down)
 - `kratt_tools.py` — Kratti read/write CLI
+- `hevy_api.py` — Hevy public API v1 (päis `api-key`, `.env` HEVY_API_KEY; beetas → toor-JSON salvestatakse)
+- `hevy_sync.py` — `check` / `sync [--dry-run] [--all] [--retry-failed]` / `map` / `rebuild` (raw_json-ist uuesti pärast vastete muutust)
+  - Harjutuste vasted `exercise_config.HEVY_TEMPLATES` (meie nimi → Hevy nimi + template id, kontrollitud 25.09.2026); tundmatu Hevy nimi jääb Hevy omaks + hoiatus
+  - Varustus Hevy nime sulgudest ("(Cable)" → cable), muidu meie vaikevarustus (Face Pull → trx)
+  - Soojendusseeriad (type=warmup) EI lähe `sets`-i (progressioon/PR); on raw_json-is
+  - Dedup: Hevy vs CSV/Strava ±15 min → kes enne tuli, jääb; CSV import keeldub, kui Hevy-kirje on olemas
+  - Hevy API EI anna pulssi ega kcal-i
+  - Cron veel POLE — alles pärast paari käsitsi sünki (Hevy palub mitte pärida täpselt xx:00)
+- `hevy_routines.py` — `.gymdata` kava → Hevy rutiinid (`--push`; sama nimega rutiin uuendatakse). Kaal/vahemik/soojendus loetakse kavamärkustest
 - `strava_api.py` — Strava OAuth + GET (urllib); token `data/strava_token.json` (0600, refresh token vahetub igal uuendusel)
 - `strava_sync.py` — Strava → baas. `auth [--code]`, `sync [--days 14] [--dry-run] [--activity ID] [--retry-failed]`; teavitus `TRENN_DISCORD_WEBHOOK`
-  - **OOTEL (24.09.2026):** Strava API vajab alates 06.2026 tasulist Strava tellimust (API-rakendust ei saa ilma luua).
+  - **ASENDATUD Hevyga (25.09.2026)**; varasem ootel-märge: Strava API vajab alates 06.2026 tasulist Strava tellimust (API-rakendust ei saa ilma luua).
     Aimar otsustas: CSV jääb põhiteeks, kood jääb ootele. Sisselülitamine: tellimus → strava.com/settings/api
     (callback domain `localhost`) → `.env` STRAVA_CLIENT_ID/SECRET → `auth` → `sync --dry-run` → cron.
     Parser + dedup on päris kirjelduste vastu testitud (9 jõutrenni, kõik seeriad klappisid).
@@ -48,7 +62,8 @@ Lives trenni ajal (Kratt Discordis):
 - `sets` — üksikseeriad. `weight_kg=NULL` = kaalu pole logitud (EI 0.0!)
 - `exercises` — vaikevarustus, rep-vahemikud, lihasgrupp
 - `strava_activities` — sünkrologi (activity_id → status imported/duplicate/skipped/failed); failed-e ei proovita uuesti ilma `--retry-failed`-ita
-- `workouts.source`: `gymaholic_csv` / `strava` / `fit` / `gpx` / `gymaholic` (v1 legacy)
+- `hevy_workouts` — Hevy sünkrologi (hevy_id → status imported/duplicate/failed/deleted, updated_at, raw_json)
+- `workouts.source`: `hevy` / `gymaholic_csv` / `strava` / `fit` / `gpx` / `gymaholic` (v1 legacy)
 - Rekordid arvutatakse päringuga (`queries.compute_prs`), EI salvestata eraldi
 
 ## HTML väljund (mobile-first, drill-down)
